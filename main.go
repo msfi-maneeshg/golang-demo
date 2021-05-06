@@ -2,6 +2,7 @@ package main
 
 import (
 	"api"
+	"database"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -13,26 +14,22 @@ import (
 
 func main() {
 
-	router := mux.NewRouter()
+	//-------connection database
+	err := database.ConnectDatabase()
+	if err != nil {
+		log.Fatal(err)
+	}
 
+	//-------setting up route
+	router := mux.NewRouter()
 	router.HandleFunc("/health", health)
 	router.HandleFunc("/registration", api.UserRegistration).Methods("POST")
 
-	// srv := &http.Server{
-	// 	Handler: router,
-	// 	Addr:    "127.0.0.1:8000",
-	// 	// Good practice: enforce timeouts for servers you create!
-	// 	WriteTimeout:   15 * time.Second,
-	// 	ReadTimeout:    15 * time.Second,
-	// 	AllowedOrigins: []string{"*"},
-	// }
-
 	c := cors.New(cors.Options{
 		AllowedOrigins:   []string{"*"},
-		AllowedMethods:   []string{"GET", "POST", "OPTIONS", "Authorization"},
+		AllowedMethods:   []string{"GET", "POST"},
 		AllowedHeaders:   []string{"*"},
 		AllowCredentials: true,
-		//Debug:            true,
 	})
 	fmt.Println("Server is started...")
 	log.Fatal(http.ListenAndServe(":8000", c.Handler(router)))
