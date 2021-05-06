@@ -80,6 +80,18 @@ func UserRegistration(w http.ResponseWriter, r *http.Request) {
 
 }
 
+//UserList :
+func UserList(w http.ResponseWriter, r *http.Request) {
+	userList, err := getUserList()
+	if err != nil {
+		common.APIResponse(w, http.StatusInternalServerError, "Error while getting user list")
+		return
+	}
+	common.APIResponse(w, http.StatusOK, userList)
+	return
+}
+
+//---------data functions
 func isEmailExist(email string) (bool, error) {
 	var emailID string
 	sqlStr := "SELECT email FROM users WHERE email = ?"
@@ -107,4 +119,29 @@ func insertNewUser(objRegistration Registration) error {
 		return err
 	}
 	return nil
+}
+
+func getUserList() ([]Registration, error) {
+	var allUsers []Registration
+	sqlStr := "SELECT name,email,phone FROM users "
+
+	allRows, err := database.DemoDB.Query(sqlStr)
+	if err != nil {
+		return allUsers, err
+	}
+	for allRows.Next() {
+		var userDetails Registration
+		var name, email sql.NullString
+		var phone sql.NullInt64
+		allRows.Scan(
+			&name,
+			&email,
+			&phone,
+		)
+		userDetails.Name = name.String
+		userDetails.Email = email.String
+		userDetails.Phone = strconv.Itoa(int(phone.Int64))
+		allUsers = append(allUsers, userDetails)
+	}
+	return allUsers, nil
 }
