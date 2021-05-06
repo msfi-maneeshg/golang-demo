@@ -25,6 +25,7 @@ func main() {
 	router.HandleFunc("/health", health)
 	router.HandleFunc("/registration", api.UserRegistration).Methods("POST")
 	router.HandleFunc("/user-list", api.UserList).Methods("GET")
+	router.HandleFunc("/login", api.Login).Methods("POST")
 
 	c := cors.New(cors.Options{
 		AllowedOrigins:   []string{"*"},

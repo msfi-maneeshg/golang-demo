@@ -18,6 +18,12 @@ type Registration struct {
 	Password string `json:"password"`
 }
 
+//LoginDetails :
+type LoginDetails struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
 //UserRegistration :
 func UserRegistration(w http.ResponseWriter, r *http.Request) {
 	var objRegistration Registration
@@ -82,13 +88,59 @@ func UserRegistration(w http.ResponseWriter, r *http.Request) {
 
 //UserList :
 func UserList(w http.ResponseWriter, r *http.Request) {
-	userList, err := getUserList()
+	userList, err := getUserList("")
 	if err != nil {
 		common.APIResponse(w, http.StatusInternalServerError, "Error while getting user list")
 		return
 	}
 	common.APIResponse(w, http.StatusOK, userList)
 	return
+}
+
+//Login :
+func Login(w http.ResponseWriter, r *http.Request) {
+	var objLoginDetails LoginDetails
+	var err error
+
+	if r.Body == nil {
+		common.APIResponse(w, http.StatusBadRequest, "Request body can not be blank")
+		return
+	}
+	err = json.NewDecoder(r.Body).Decode(&objLoginDetails)
+	if err != nil {
+		common.APIResponse(w, http.StatusBadRequest, "Error:"+err.Error())
+		return
+	}
+
+	//-------validate data
+	if objLoginDetails.Email == "" {
+		common.APIResponse(w, http.StatusBadRequest, "Email can not be empty")
+		return
+	}
+
+	if objLoginDetails.Password == "" {
+		common.APIResponse(w, http.StatusBadRequest, "Password can not be empty")
+		return
+	}
+
+	users, err := getUserList(objLoginDetails.Email)
+	if err != nil {
+		common.APIResponse(w, http.StatusInternalServerError, "Getting error when checking login details. Error:"+err.Error())
+		return
+	}
+	if len(users) == 0 {
+		common.APIResponse(w, http.StatusNotFound, "This email is not registered.")
+		return
+	}
+
+	if users[0].Password != objLoginDetails.Password {
+		common.APIResponse(w, http.StatusBadRequest, "Invalid login details.")
+		return
+	}
+	users[0].Password = ""
+	common.APIResponse(w, http.StatusOK, users[0])
+	return
+
 }
 
 //---------data functions
@@ -121,26 +173,33 @@ func insertNewUser(objRegistration Registration) error {
 	return nil
 }
 
-func getUserList() ([]Registration, error) {
+func getUserList(findEmail string) ([]Registration, error) {
 	var allUsers []Registration
-	sqlStr := "SELECT name,email,phone FROM users "
-
-	allRows, err := database.DemoDB.Query(sqlStr)
+	var whereStr string
+	sqlStr := "SELECT name,email,phone,password FROM users "
+	if findEmail != "" {
+		whereStr = " WHERE email = '" + findEmail + "'"
+	}
+	allRows, err := database.DemoDB.Query(sqlStr + whereStr)
 	if err != nil {
 		return allUsers, err
 	}
 	for allRows.Next() {
 		var userDetails Registration
-		var name, email sql.NullString
+		var name, email, password sql.NullString
 		var phone sql.NullInt64
 		allRows.Scan(
 			&name,
 			&email,
 			&phone,
+			&password,
 		)
 		userDetails.Name = name.String
 		userDetails.Email = email.String
 		userDetails.Phone = strconv.Itoa(int(phone.Int64))
+		if findEmail != "" {
+			userDetails.Password = password.String
+		}
 		allUsers = append(allUsers, userDetails)
 	}
 	return allUsers, nil
