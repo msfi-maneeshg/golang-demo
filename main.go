@@ -26,10 +26,11 @@ func main() {
 	router.HandleFunc("/registration", api.UserRegistration).Methods("POST")
 	router.HandleFunc("/user-list", api.UserList).Methods("GET")
 	router.HandleFunc("/login", api.Login).Methods("POST")
+	router.HandleFunc("/update-detail/{id}", api.UpdateDetail).Methods("UPDATE")
 
 	c := cors.New(cors.Options{
 		AllowedOrigins:   []string{"*"},
-		AllowedMethods:   []string{"GET", "POST"},
+		AllowedMethods:   []string{"GET", "POST", "UPDATE"},
 		AllowedHeaders:   []string{"*"},
 		AllowCredentials: true,
 	})
