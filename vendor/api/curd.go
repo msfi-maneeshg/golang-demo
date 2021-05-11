@@ -4,9 +4,11 @@ import (
 	"common"
 	"database"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 
 	"github.com/gorilla/mux"
@@ -14,11 +16,12 @@ import (
 
 //UserInformation :
 type UserInformation struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Email    string `json:"email"`
-	Phone    string `json:"phone"`
-	Password string `json:"password"`
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	Email        string `json:"email"`
+	Phone        string `json:"phone"`
+	ProfileImage string `json:"profileImage"`
+	Password     string `json:"password"`
 }
 
 //LoginDetails :
@@ -30,8 +33,8 @@ type LoginDetails struct {
 //UserRegistration :
 func UserRegistration(w http.ResponseWriter, r *http.Request) {
 	var objRegistration UserInformation
-	var err error
 
+	var err error
 	if r.Body == nil {
 		common.APIResponse(w, http.StatusBadRequest, "Request body can not be blank")
 		return
@@ -191,6 +194,28 @@ func UpdateDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	//-------
+	if objRegistration.ProfileImage != "" {
+		dec, err := base64.StdEncoding.DecodeString(objRegistration.ProfileImage)
+		if err != nil {
+			panic(err)
+		}
+
+		f, err := os.Create("images/" + objRegistration.Name + ".jpg")
+		if err != nil {
+			panic(err)
+		}
+		defer f.Close()
+
+		if _, err := f.Write(dec); err != nil {
+			panic(err)
+		}
+		if err := f.Sync(); err != nil {
+			panic(err)
+		}
+		objRegistration.ProfileImage = objRegistration.Name + ".jpg"
+	}
+
 	err = updateUserDetails(objRegistration, id)
 	if err != nil {
 		common.APIResponse(w, http.StatusInternalServerError, "Getting error while updating user info. Error:"+err.Error())
@@ -198,6 +223,46 @@ func UpdateDetail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	common.APIResponse(w, http.StatusOK, "User detail has been updated.")
+	return
+}
+
+//UpdatePassword :
+func UpdatePassword(w http.ResponseWriter, r *http.Request) {
+	var err error
+	vars := mux.Vars(r)
+	var id = vars["id"]
+
+	password := r.FormValue("password")
+	confirmPassword := r.FormValue("confirmPassword")
+
+	if password == "" || confirmPassword == "" {
+		common.APIResponse(w, http.StatusBadRequest, "Request body can not be blank.")
+		return
+	}
+
+	if password != confirmPassword {
+		common.APIResponse(w, http.StatusBadRequest, "Password is not matching.")
+		return
+	}
+
+	isExist, err := isIDExist(id)
+	if err != nil {
+		common.APIResponse(w, http.StatusInternalServerError, "Error while checking is exist or not."+err.Error())
+		return
+	}
+
+	if !isExist {
+		common.APIResponse(w, http.StatusBadRequest, "Invalid data.")
+		return
+	}
+
+	err = updateUserPassword(password, id)
+	if err != nil {
+		common.APIResponse(w, http.StatusInternalServerError, "Getting error while updating user password. Error:"+err.Error())
+		return
+	}
+
+	common.APIResponse(w, http.StatusOK, "Password has been changed.")
 	return
 }
 
@@ -246,7 +311,22 @@ func insertNewUser(objRegistration UserInformation) error {
 }
 
 func updateUserDetails(objUserDetail UserInformation, id string) error {
-	sqlStr := fmt.Sprintf("Update users SET `name` = '%v', `phone` = '%v' where id = '%v'", objUserDetail.Name, objUserDetail.Phone, id)
+	sqlStr := fmt.Sprintf("Update users SET `name` = '%v', `phone` = '%v', `profile_image` = '%v' where id = '%v'", objUserDetail.Name, objUserDetail.Phone, objUserDetail.ProfileImage, id)
+	stmt, err := database.DemoDB.Prepare(sqlStr)
+	defer stmt.Close()
+	if err != nil {
+		return err
+	}
+
+	_, err = stmt.Exec()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func updateUserPassword(newPassword, id string) error {
+	sqlStr := fmt.Sprintf("Update users SET `password` = '%v'where id = '%v'", newPassword, id)
 	stmt, err := database.DemoDB.Prepare(sqlStr)
 	defer stmt.Close()
 	if err != nil {
@@ -263,7 +343,7 @@ func updateUserDetails(objUserDetail UserInformation, id string) error {
 func getUserList(findEmail string) ([]UserInformation, error) {
 	var allUsers []UserInformation
 	var whereStr string
-	sqlStr := "SELECT id,name,email,phone,password FROM users "
+	sqlStr := "SELECT id,name,email,phone,password,profile_image FROM users "
 	if findEmail != "" {
 		whereStr = " WHERE email = '" + findEmail + "'"
 	}
@@ -273,7 +353,7 @@ func getUserList(findEmail string) ([]UserInformation, error) {
 	}
 	for allRows.Next() {
 		var userDetails UserInformation
-		var name, email, password, phone sql.NullString
+		var name, email, password, phone, profileImage sql.NullString
 		var id sql.NullInt64
 		allRows.Scan(
 			&id,
@@ -281,10 +361,12 @@ func getUserList(findEmail string) ([]UserInformation, error) {
 			&email,
 			&phone,
 			&password,
+			&profileImage,
 		)
 		userDetails.Name = name.String
 		userDetails.Email = email.String
 		userDetails.Phone = phone.String
+		userDetails.ProfileImage = profileImage.String
 		userDetails.ID = strconv.Itoa(int(id.Int64))
 		if findEmail != "" {
 			userDetails.Password = password.String
