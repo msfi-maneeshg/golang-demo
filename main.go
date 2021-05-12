@@ -29,6 +29,7 @@ func main() {
 	router.HandleFunc("/update-detail/{id}", user.UpdateDetail).Methods("UPDATE")
 	router.HandleFunc("/update-password/{id}", user.UpdatePassword).Methods("UPDATE")
 	router.HandleFunc("/image/{file-name}", GetImage)
+	router.HandleFunc("/user-detail/{id}", user.UserDetail).Methods("GET")
 
 	c := cors.New(cors.Options{
 		AllowedOrigins:   []string{"*"},

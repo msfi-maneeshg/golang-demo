@@ -99,6 +99,23 @@ func UserList(w http.ResponseWriter, r *http.Request) {
 	common.APIResponse(w, http.StatusOK, userList)
 }
 
+//UserDetail :
+func UserDetail(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	var id = vars["id"]
+	userProfile, err := getUserInfo(id)
+	if err != nil {
+		common.APIResponse(w, http.StatusInternalServerError, "Error while getting user list")
+		return
+	}
+	if userProfile == (UserInformation{}) {
+		common.APIResponse(w, http.StatusNotFound, "User profile not found")
+		return
+	}
+
+	common.APIResponse(w, http.StatusOK, userProfile)
+}
+
 //Login :
 func Login(w http.ResponseWriter, r *http.Request) {
 	var objLoginDetails LoginDetails
@@ -290,7 +307,8 @@ func isIDExist(id string) (bool, error) {
 }
 
 func insertNewUser(objRegistration UserInformation) error {
-	sqlStr := fmt.Sprintf("INSERT INTO users (email,phone,name,password) VALUES ('%v','%v','%v','%v')", objRegistration.Email, objRegistration.Phone, objRegistration.Name, objRegistration.Password)
+	noProfileImage := "no-profile.jpg"
+	sqlStr := fmt.Sprintf("INSERT INTO users (email,phone,name,password,profile_image) VALUES ('%v','%v','%v','%v','%v')", objRegistration.Email, objRegistration.Phone, objRegistration.Name, objRegistration.Password, noProfileImage)
 	stmt, err := data.DemoDB.Prepare(sqlStr)
 	defer stmt.Close()
 	if err != nil {
@@ -373,4 +391,27 @@ func getUserList(findEmail string) ([]UserInformation, error) {
 		allUsers = append(allUsers, userDetails)
 	}
 	return allUsers, nil
+}
+
+func getUserInfo(id string) (objUserInfo UserInformation, err error) {
+	sqlStr := "SELECT name,email,phone,password,profile_image FROM users WHERE id = ?"
+	var name, email, password, phone, profileImage sql.NullString
+	err = data.DemoDB.QueryRow(sqlStr, id).Scan(
+		&name,
+		&email,
+		&phone,
+		&password,
+		&profileImage,
+	)
+	if err != nil && err != sql.ErrNoRows {
+		return objUserInfo, err
+	}
+	if err != sql.ErrNoRows {
+		objUserInfo.Name = name.String
+		objUserInfo.Email = email.String
+		objUserInfo.Phone = phone.String
+		objUserInfo.ProfileImage = profileImage.String
+		objUserInfo.ID = id
+	}
+	return objUserInfo, nil
 }
