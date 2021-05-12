@@ -1,12 +1,12 @@
-package api
+package user
 
 import (
-	"common"
-	"database"
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"golang-demo/api/common"
+	"golang-demo/api/data"
 	"net/http"
 	"os"
 	"strconv"
@@ -33,7 +33,6 @@ type LoginDetails struct {
 //UserRegistration :
 func UserRegistration(w http.ResponseWriter, r *http.Request) {
 	var objRegistration UserInformation
-
 	var err error
 	if r.Body == nil {
 		common.APIResponse(w, http.StatusBadRequest, "Request body can not be blank")
@@ -46,7 +45,6 @@ func UserRegistration(w http.ResponseWriter, r *http.Request) {
 	}
 
 	//-------validate data
-
 	if objRegistration.Name == "" {
 		common.APIResponse(w, http.StatusBadRequest, "Name can not be empty")
 		return
@@ -88,7 +86,6 @@ func UserRegistration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	common.APIResponse(w, http.StatusOK, "User registered successfully.")
-	return
 
 }
 
@@ -100,7 +97,6 @@ func UserList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	common.APIResponse(w, http.StatusOK, userList)
-	return
 }
 
 //Login :
@@ -145,13 +141,12 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	}
 	users[0].Password = ""
 	common.APIResponse(w, http.StatusOK, users[0])
-	return
 
 }
 
 //UpdateDetail :
 func UpdateDetail(w http.ResponseWriter, r *http.Request) {
-	var objRegistration UserInformation
+	var objUserInformation UserInformation
 	var err error
 	vars := mux.Vars(r)
 	var id = vars["id"]
@@ -160,7 +155,7 @@ func UpdateDetail(w http.ResponseWriter, r *http.Request) {
 		common.APIResponse(w, http.StatusBadRequest, "Request body can not be blank")
 		return
 	}
-	err = json.NewDecoder(r.Body).Decode(&objRegistration)
+	err = json.NewDecoder(r.Body).Decode(&objUserInformation)
 	if err != nil {
 		common.APIResponse(w, http.StatusBadRequest, "Error:"+err.Error())
 		return
@@ -168,16 +163,16 @@ func UpdateDetail(w http.ResponseWriter, r *http.Request) {
 
 	//-------validate data
 
-	if objRegistration.Name == "" {
+	if objUserInformation.Name == "" {
 		common.APIResponse(w, http.StatusBadRequest, "Name can not be empty")
 		return
 	}
 
-	if objRegistration.Phone == "" {
+	if objUserInformation.Phone == "" {
 		common.APIResponse(w, http.StatusBadRequest, "Phone number can not be empty")
 		return
 	}
-	_, err = strconv.Atoi(objRegistration.Phone)
+	_, err = strconv.Atoi(objUserInformation.Phone)
 	if err != nil {
 		common.APIResponse(w, http.StatusBadRequest, "Invalid data of phone number")
 		return
@@ -195,13 +190,14 @@ func UpdateDetail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	//-------
-	if objRegistration.ProfileImage != "" {
-		dec, err := base64.StdEncoding.DecodeString(objRegistration.ProfileImage)
+	if objUserInformation.ProfileImage != "" {
+		dec, err := base64.StdEncoding.DecodeString(objUserInformation.ProfileImage)
 		if err != nil {
-			panic(err)
+			common.APIResponse(w, http.StatusBadRequest, "Invalid data of image."+err.Error())
+			return
 		}
 
-		f, err := os.Create("images/" + objRegistration.Name + ".jpg")
+		f, err := os.Create("images/" + objUserInformation.Name + ".jpg")
 		if err != nil {
 			panic(err)
 		}
@@ -213,17 +209,17 @@ func UpdateDetail(w http.ResponseWriter, r *http.Request) {
 		if err := f.Sync(); err != nil {
 			panic(err)
 		}
-		objRegistration.ProfileImage = objRegistration.Name + ".jpg"
+		objUserInformation.ProfileImage = objUserInformation.Name + ".jpg"
 	}
 
-	err = updateUserDetails(objRegistration, id)
+	err = updateUserDetails(objUserInformation, id)
 	if err != nil {
 		common.APIResponse(w, http.StatusInternalServerError, "Getting error while updating user info. Error:"+err.Error())
 		return
 	}
 
 	common.APIResponse(w, http.StatusOK, "User detail has been updated.")
-	return
+
 }
 
 //UpdatePassword :
@@ -263,15 +259,13 @@ func UpdatePassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	common.APIResponse(w, http.StatusOK, "Password has been changed.")
-	return
 }
 
 //---------data functions
 func isEmailExist(email string) (bool, error) {
 	var emailID string
 	sqlStr := "SELECT email FROM users WHERE email = ?"
-
-	err := database.DemoDB.QueryRow(sqlStr, email).Scan(&emailID)
+	err := data.DemoDB.QueryRow(sqlStr, email).Scan(&emailID)
 	if err != nil && err != sql.ErrNoRows {
 		return false, err
 	}
@@ -285,7 +279,7 @@ func isIDExist(id string) (bool, error) {
 	var emailID string
 	sqlStr := "SELECT email FROM users WHERE id = ?"
 
-	err := database.DemoDB.QueryRow(sqlStr, id).Scan(&emailID)
+	err := data.DemoDB.QueryRow(sqlStr, id).Scan(&emailID)
 	if err != nil && err != sql.ErrNoRows {
 		return false, err
 	}
@@ -297,7 +291,7 @@ func isIDExist(id string) (bool, error) {
 
 func insertNewUser(objRegistration UserInformation) error {
 	sqlStr := fmt.Sprintf("INSERT INTO users (email,phone,name,password) VALUES ('%v','%v','%v','%v')", objRegistration.Email, objRegistration.Phone, objRegistration.Name, objRegistration.Password)
-	stmt, err := database.DemoDB.Prepare(sqlStr)
+	stmt, err := data.DemoDB.Prepare(sqlStr)
 	defer stmt.Close()
 	if err != nil {
 		return err
@@ -311,8 +305,13 @@ func insertNewUser(objRegistration UserInformation) error {
 }
 
 func updateUserDetails(objUserDetail UserInformation, id string) error {
-	sqlStr := fmt.Sprintf("Update users SET `name` = '%v', `phone` = '%v', `profile_image` = '%v' where id = '%v'", objUserDetail.Name, objUserDetail.Phone, objUserDetail.ProfileImage, id)
-	stmt, err := database.DemoDB.Prepare(sqlStr)
+	var profileImageStr string
+	if objUserDetail.ProfileImage != "" {
+		profileImageStr = fmt.Sprintf(", `profile_image` = '%v'", objUserDetail.ProfileImage)
+	}
+	sqlStr := fmt.Sprintf("Update users SET `name` = '%v', `phone` = '%v '"+profileImageStr+" where id = '%v'", objUserDetail.Name, objUserDetail.Phone, id)
+
+	stmt, err := data.DemoDB.Prepare(sqlStr)
 	defer stmt.Close()
 	if err != nil {
 		return err
@@ -327,7 +326,7 @@ func updateUserDetails(objUserDetail UserInformation, id string) error {
 
 func updateUserPassword(newPassword, id string) error {
 	sqlStr := fmt.Sprintf("Update users SET `password` = '%v'where id = '%v'", newPassword, id)
-	stmt, err := database.DemoDB.Prepare(sqlStr)
+	stmt, err := data.DemoDB.Prepare(sqlStr)
 	defer stmt.Close()
 	if err != nil {
 		return err
@@ -347,7 +346,7 @@ func getUserList(findEmail string) ([]UserInformation, error) {
 	if findEmail != "" {
 		whereStr = " WHERE email = '" + findEmail + "'"
 	}
-	allRows, err := database.DemoDB.Query(sqlStr + whereStr)
+	allRows, err := data.DemoDB.Query(sqlStr + whereStr)
 	if err != nil {
 		return allUsers, err
 	}

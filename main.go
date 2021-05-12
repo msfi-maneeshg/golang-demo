@@ -1,10 +1,10 @@
 package main
 
 import (
-	"api"
-	"database"
 	"encoding/json"
 	"fmt"
+	"golang-demo/api/data"
+	"golang-demo/api/user"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -14,9 +14,8 @@ import (
 )
 
 func main() {
-
 	//-------connection database
-	err := database.ConnectDatabase()
+	err := data.ConnectDatabase()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -24,11 +23,11 @@ func main() {
 	//-------setting up route
 	router := mux.NewRouter()
 	router.HandleFunc("/health", health)
-	router.HandleFunc("/registration", api.UserRegistration).Methods("POST")
-	router.HandleFunc("/user-list", api.UserList).Methods("GET")
-	router.HandleFunc("/login", api.Login).Methods("POST")
-	router.HandleFunc("/update-detail/{id}", api.UpdateDetail).Methods("UPDATE")
-	router.HandleFunc("/update-password/{id}", api.UpdatePassword).Methods("UPDATE")
+	router.HandleFunc("/registration", user.UserRegistration).Methods("POST")
+	router.HandleFunc("/user-list", user.UserList).Methods("GET")
+	router.HandleFunc("/login", user.Login).Methods("POST")
+	router.HandleFunc("/update-detail/{id}", user.UpdateDetail).Methods("UPDATE")
+	router.HandleFunc("/update-password/{id}", user.UpdatePassword).Methods("UPDATE")
 	router.HandleFunc("/image/{file-name}", GetImage)
 
 	c := cors.New(cors.Options{
