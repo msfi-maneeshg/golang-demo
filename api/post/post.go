@@ -64,3 +64,16 @@ func AddPost(w http.ResponseWriter, r *http.Request) {
 	}
 	common.APIResponse(w, http.StatusOK, "Post added successfully.")
 }
+
+func GetPost(w http.ResponseWriter, r *http.Request) {
+	allPosts, err := GetAllPostDetails()
+	if err != nil {
+		common.APIResponse(w, http.StatusInternalServerError, "Error while getting user post"+err.Error())
+		return
+	}
+	if len(allPosts) == 0 {
+		common.APIResponse(w, http.StatusNoContent, "There is no post!")
+		return
+	}
+	common.APIResponse(w, http.StatusOK, allPosts)
+}

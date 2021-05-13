@@ -29,10 +29,11 @@ func main() {
 	router.HandleFunc("/login", user.Login).Methods("POST")
 	router.HandleFunc("/update-detail/{id}", user.UpdateDetail).Methods("UPDATE")
 	router.HandleFunc("/update-password/{id}", user.UpdatePassword).Methods("UPDATE")
-	router.HandleFunc("/image/{file-name}", GetCDNImagePath)
+	router.HandleFunc("/image/{file-path}/{file-name}", GetCDNImagePath)
 	router.HandleFunc("/user-detail/{id}", user.UserDetail).Methods("GET")
 
 	router.HandleFunc("/add-post/{id}", post.AddPost).Methods("POST")
+	router.HandleFunc("/get-post", post.GetPost).Methods("GET")
 
 	c := cors.New(cors.Options{
 		AllowedOrigins:   []string{"*"},
@@ -53,8 +54,9 @@ func health(w http.ResponseWriter, r *http.Request) {
 //GetImage :
 func GetCDNImagePath(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
+	var filePath = vars["file-path"]
 	var fileName = vars["file-name"]
-	data, _ := ioutil.ReadFile("images/profile/" + fileName)
+	data, _ := ioutil.ReadFile("images/" + filePath + "/" + fileName)
 	w.Write(data)
 	r.Body.Close()
 }
